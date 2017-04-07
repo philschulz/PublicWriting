@@ -1,0 +1,77 @@
+\documentclass[a4paper, 11pt]{article}
+
+\usepackage{amsmath, amssymb, xifthen}
+\usepackage{hyperref}
+\hypersetup{breaklinks=true, linkcolor=blue, urlcolor=blue, colorlinks=true}
+\usepackage[round]{natbib}
+
+\author{Philip Schulz}
+\title{Computing the ELBO of a Dirichlet distribution}
+\date{last modified: \today}
+
+\DeclareMathOperator{\ELBO}{ELBO}
+\DeclareMathOperator{\Dir}{Dir}
+\newcommand{\E}[2][]{
+\ifthenelse{\equal{#1}{}}{\mathbb{E}\left[ #2 \right]}{\mathbb{E}_{#1}\left[ #2 \right]}
+}
+\newcommand{\Ent}[1]{\mathbb{H}\left( #1 \right)}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This short note describes how to compute the value of the evidence lower bound (ELBO) of the Dirichlet distribution for fixed variational parameters. The derivation extends to a large class of models, including
+Bayesian non-parametric models of discrete data where the ELBO contains many Dirichlet terms.
+\end{abstract}
+
+\section{Computing the Dirichlet ELBO}
+
+We assume a data categorical (or multinomial) set $ (x_{1}, \ldots, x_{n}) $ where each $ x_{i},\ 1 \leq i \leq n $ represents a group of data points. These groups may
+vary in size so that we have $ |x_{i}| = N_{i},\ N_{i} \in \mathbb{N} $. We model each group $ x_{i} $ as a draw from a cateogorical (or multinomial) distribution
+with parameter vector $ \theta_{i} \in \mathbb{R}^{m} $. The parameter vectors $ \theta_{i} $ are in turn assumed to be i.i.d. draws from a Dirichlet distribution with 
+parameter vector $ \alpha $. This leads to the following likelihood.
+\begin{equation}
+\text{L}(\theta_{1}^{n}, \alpha) = \prod_{i=1}^{n}p(\theta_{i}|\alpha)\prod_{j=1}^{N_{i}}P(x_{ij}|\theta_{i})
+\end{equation}
+
+At this point it is convenient to remind ourselves of the exponential family form of the Dirichlet distribution which is given below.
+\begin{equation} \label{eq:expFam}
+p(\theta|\alpha) = \exp\left(\sum_{j=1}^{N}\log(\theta_{j})(\alpha-1) - \left(\sum_{j=1}^{N}\log\Gamma(\alpha_{j}) - \log\Gamma\left(\sum_{j=1}^{N}\alpha_{j}\right)\right) \right)
+\end{equation}
+
+Because the group-specific categorical distributions were drawn from the same Dirichlet our data points have become marginally dependent, making exact inference in this
+model impossible. We therefore wish to approximate the log-likelihood of our model with a tractable lower bound so as to optimise that lower bound instead of the
+log-likelihood itself. Using standard results from variational inference, the evidence lower bound fulfills these desiderata. For our model it is
+\begin{equation}
+\ELBO = \sum_{i=1}^{n} \E[q_{i}]{\log\left( p(\theta_{i}|\alpha)\prod_{j=1}^{N_{i}}P(x_{ij}|\theta_{i}) \right)} + \Ent{q_{i}}
+\end{equation}
+where $ q_{i} = \Dir(\gamma_{i}) $ is the variational distribution for the $ i^{th} $ group which is also assumed to be Dirichlet.\footnote{Throughout this note
+we make a mean field assumption meaning that the variational distribution factorises fully over all nodes in our graphical model.} Since the Elbo factorises over 
+groups, we only derive it for one group here. Let us first deal with the expectation $ \E[q_{i}]{\log\left( \prod_{j=1}^{N_{i}}P(x_{ij}|\theta_{i} \right)} $. 
+Since the expected value of the sufficient statistics of any exponential family distribution is equal to the first derivate of its log-normaliser\footnote{The log-normaliser in Equation~\eqref{eq:expFam} is the second term of the difference in the exponent.}, we conclude
+from Equation~\eqref{eq:expFam} that 
+\begin{equation}
+\E[q_{i}]{\log\left( P(x_{ij}|\theta_{i}) \right)} = \E[q_{i}]{\log(\theta_{ij})} = \Psi(\gamma_{ij}) - \Psi\left(\sum_{j=1}^{N_{i}}\gamma_{ij}\right) 
+\end{equation}
+where $ \Psi = \frac{\Gamma'}{\Gamma} $ is the digamma function.
+
+Next, we need to compute $ \E[q_{i}]{\log(p(\theta_{i}|\alpha)} + \Ent{q_{i}} $ which for convenience we rewrite as 
+$ \E[q_{i}]{\log(p(\theta_{i}|\alpha)) - \log(q_{i}(\theta_{i}|\gamma_{i}))} $. Using the exponential family formulation of the Dirichlet one more time, computing this
+quantity amounts to taking the (expected) difference between two exponential families which share their sufficient statistics. 
+Notice that these (expected) sufficient statistics 
+are exactly $ \forall j \ \E[q_{i}]{\log(\theta_{ij})} $ from Equation~\eqref{eq:expFam}. In order to simplify notation, we solely derive the difference between
+the exponential families without reference to a particular group.
+\begin{equation}
+\begin{aligned}
+&\E[q]{\log(p(\theta|\alpha)) - \log(q(\theta|\gamma))} = \\
+&\sum_{j=1}^{N}\E[q]{\log(\theta_{j})} (\alpha-1) - \left(\sum_{j=1}^{N}\log\Gamma(\alpha_{j}) - \log\Gamma\left(\sum_{j=1}^{N}\alpha_{j}\right)\right) \\
+&- \sum_{j=1}^{N}\E[q]{\log(\theta_{j})} (\gamma-1) + \left(\sum_{j=1}^{N}\log\Gamma(\gamma_{j}) - \log\Gamma\left(\sum_{j=1}^{N}\gamma_{j}\right)\right) \\
+&= \left\{\sum_{j=1}^{N} \E[q]{\log(\theta_{j})} (\alpha_{j} - \gamma_{j}) + \log\Gamma(\gamma_{j}) - \log\Gamma(\alpha_{j})\right\} \\
+&+ \log\Gamma\left(\sum_{j=1}^{N} \alpha_{j}\right) - \log\Gamma\left(\sum_{j=1}^{N} \gamma_{j}\right)
+\end{aligned}
+\end{equation} 
+\bibliographystyle{plainnat}
+\bibliography{../CLBib}
+
+\end{document}
